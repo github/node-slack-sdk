@@ -46,10 +46,11 @@ class Client extends EventEmitter
     @logger.info 'Connecting...'
     @_apiCall 'rtm.start', {agent: 'node-slack'}, @_onLogin
 
-  _onLogin: (data) =>
+  _onLogin: (data, headers) =>
     if data
       if not data.ok
-        @emit 'error', data.error
+        @emit 'error', data # we want the entire body
+        @emit 'error', headers if headers? # useful if rate-limited
         @authenticated = false
 
         if @autoReconnect then @reconnect()
@@ -555,6 +556,10 @@ class Client extends EventEmitter
           if res.statusCode is 200
             value = JSON.parse(buffer)
             callback(value)
+          else if res.statusCode is 429
+            value = JSON.parse(buffer)
+            value.ok = false
+            callback(value, res.headers)
           else
             callback({'ok': false, 'error': 'API response: '+res.statusCode})
 
